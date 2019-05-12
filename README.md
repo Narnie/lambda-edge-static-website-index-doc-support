@@ -1,5 +1,5 @@
 # static-webinator
-This repo deploys the infrastructure to create a static website which is whitelisted to the office's IP addresses. It will deploy the following resources: 
+This repo deploys the infrastructure to create a static website. It will deploy the following resources: 
 
 - A private S3 Bucket for your static website content
 - A cloudfront distribution 
@@ -7,11 +7,9 @@ This repo deploys the infrastructure to create a static website which is whiteli
 - A Bucket Policy to allow cloudfront to access the S3 bucket
 - An ACM certificate for your custom domain 
 
-
 ## Deployment 
 
 If you do not have a bucket for your Lambda code you will need to create one. Create the bucket for the lambda code in the same aws account where your static bucket will go, for example:
-
 
 `aws s3api create-bucket --bucket webinator-lambda-bucket-1234 --profile YOUR-AWS_PROFILE_NAME --region us-east-1`
 
