@@ -1,0 +1,21 @@
+#!/bin/bash -e
+set -euo pipefail
+cd "$(dirname $0)/.."
+
+
+./auto/update-params ${BUCKET_NAME}
+
+echo "+++ Deploying Lambda at edge with SAM Bucket: ${BUCKET_NAME} Domain Name: ${DOMAIN_NAME} "
+aws --profile ${AWS_USER_NAME} cloudformation package \
+    --template-file cloudformation/template-index-doc-support.yml \
+    --output-template-file cloudformation/packaged.yaml \
+    --s3-bucket ${LAMBDA_BUCKET_NAME} \
+    --region us-east-1
+aws --profile ${AWS_USER_NAME} cloudformation deploy \
+    --template-file cloudformation/packaged.yaml \
+    --stack-name "my-static-site-with-lambda-edge" \
+    --parameter-overrides S3BucketName=${BUCKET_NAME} CloudFrontDomainName=${DOMAIN_NAME} \
+    --capabilities CAPABILITY_IAM \
+    --region us-east-1
+
+

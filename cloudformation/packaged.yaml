@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: static website for internal use which uses Lambda@Edge to provide index
+  documentation support
+Outputs:
+  CFDistribution:
+    Description: Cloudfront Distribution Domain Name
+    Value:
+      Fn::GetAtt:
+      - CFDistribution
+      - DomainName
+  LambdaEdgeFunctionSampleVersion:
+    Description: Lambda@Edge Sample Function ARN with Version
+    Value:
+      Ref: LambdaEdgeFunctionSample.Version
+Parameters:
+  CloudFrontDomainName:
+    Default: ''
+    Description: The custom domain name for the static site
+    Type: String
+  S3BucketName:
+    Default: ''
+    Description: private bucket with content for static website
+    Type: String
+Resources:
+  CFDistribution:
+    Properties:
+      DistributionConfig:
+        Aliases:
+        - Ref: CloudFrontDomainName
+        Comment: CF for static site with Lambda@Edge
+        DefaultCacheBehavior:
+          ForwardedValues:
+            Cookies:
+              Forward: none
+            Headers:
+            - Origin
+            QueryString: 'false'
+          LambdaFunctionAssociations:
+          - EventType: origin-request
+            LambdaFunctionARN:
+              Ref: LambdaEdgeFunctionSample.Version
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: allow-all
+        Enabled: 'true'
+        Origins:
+        - DomainName:
+            Fn::GetAtt:
+            - S3Bucket
+            - DomainName
+          Id: S3Origin
+          S3OriginConfig:
+            OriginAccessIdentity:
+              Fn::Join:
+              - ''
+              - - origin-access-identity/cloudfront/
+                - Ref: CloudFrontOriginAccessIdentity
+        ViewerCertificate:
+          AcmCertificateArn:
+            Ref: Certificate
+          MinimumProtocolVersion: TLSv1.1_2016
+          SslSupportMethod: sni-only
+    Type: AWS::CloudFront::Distribution
+  Certificate:
+    Properties:
+      DomainName:
+        Ref: CloudFrontDomainName
+      ValidationMethod: DNS
+    Type: AWS::CertificateManager::Certificate
+  CloudFrontOriginAccessIdentity:
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: origin access identity - Use Cloudfront origin access identity to
+          allow Cloudfront to access S3 bucket
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+  LambdaEdgeFunctionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+          Sid: AllowLambdaServiceToAssumeRole
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - s3:GetObject
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+            Sid: ReadListings
+          Version: 2012-10-17
+        PolicyName: checkFileExists
+    Type: AWS::IAM::Role
+  LambdaEdgeFunctionSample:
+    Properties:
+      AutoPublishAlias: live
+      CodeUri: s3://webinator-lambda-bucket-1234/a35e0fef96c436ff1f8158532b52dfec
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+        - LambdaEdgeFunctionRole
+        - Arn
+      Runtime: nodejs6.10
+      Timeout: 5
+    Type: AWS::Serverless::Function
+  S3Bucket:
+    Properties:
+      BucketName:
+        Ref: S3BucketName
+    Type: AWS::S3::Bucket
+  S3BucketPolicy:
+    Properties:
+      Bucket:
+        Ref: S3Bucket
+      PolicyDocument:
+        Statement:
+        - Action:
+          - s3:GetObject
+          Effect: Allow
+          Principal:
+            CanonicalUser:
+              Fn::GetAtt:
+              - CloudFrontOriginAccessIdentity
+              - S3CanonicalUserId
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${S3Bucket}/*
+          Sid: PublicReadGetObject
+        - Action:
+          - s3:ListBucket
+          Effect: Allow
+          Principal:
+            CanonicalUser:
+              Fn::GetAtt:
+              - CloudFrontOriginAccessIdentity
+              - S3CanonicalUserId
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${S3Bucket}
+          Sid: PublicListBucket
+    Type: AWS::S3::BucketPolicy
+Transform: AWS::Serverless-2016-10-31

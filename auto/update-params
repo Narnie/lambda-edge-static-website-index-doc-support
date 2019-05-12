@@ -1,0 +1,11 @@
+#!/bin/bash -e
+set -euo pipefail
+cd "$(dirname $0)/.."
+
+BUCKET=$1
+
+echo "var params = {
+        privateBucket: \"${BUCKET}\"
+      };
+
+      exports.params = params;" > src/index-doc-support/params.js

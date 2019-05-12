@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: static website for internal use which uses Lambda@Edge to provide index documentation support
+
+Parameters:
+  S3BucketName:
+    Type: 'String'
+    Description: private bucket with content for static website
+    Default: ''
+  CloudFrontDomainName:
+    Type: 'String'
+    Description: The custom domain name for the static site
+    Default: ''
+
+Resources:
+
+  Certificate:
+    Type: 'AWS::CertificateManager::Certificate'
+    Properties:
+      DomainName: !Ref 'CloudFrontDomainName'
+      ValidationMethod: 'DNS'
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+        - Sid: PublicReadGetObject
+          Effect: Allow
+          Action:
+          - s3:GetObject
+          Resource:
+          - !Sub "arn:aws:s3:::${S3Bucket}/*"
+          Principal:
+            CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+        - Sid: PublicListBucket
+          Effect: Allow
+          Action:
+          - s3:ListBucket
+          Resource:
+          - !Sub "arn:aws:s3:::${S3Bucket}"
+          Principal:
+            CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3BucketName
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: origin access identity - Use Cloudfront origin access identity to allow Cloudfront to access S3 bucket
+
+  CFDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+        - !Ref 'CloudFrontDomainName'
+        Enabled: 'true'
+        Comment: 'CF for static site with Lambda@Edge'
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: 'TLSv1.1_2016'
+          SslSupportMethod: 'sni-only'
+        Origins:
+        - Id: S3Origin
+          DomainName: !GetAtt S3Bucket.DomainName
+          S3OriginConfig:
+            OriginAccessIdentity: !Join [ "", [ "origin-access-identity/cloudfront/", !Ref CloudFrontOriginAccessIdentity ] ]
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          LambdaFunctionAssociations:
+          -
+            EventType: origin-request
+            LambdaFunctionARN: !Ref LambdaEdgeFunctionSample.Version
+          ForwardedValues:
+            QueryString: 'false'
+            Headers:
+            - Origin
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: allow-all
+
+  LambdaEdgeFunctionSample:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/index-doc-support
+      Role: !GetAtt LambdaEdgeFunctionRole.Arn
+      Runtime: nodejs6.10
+      Handler: index.handler
+      Timeout: 5
+      AutoPublishAlias: live
+
+  LambdaEdgeFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        -
+          Sid: "AllowLambdaServiceToAssumeRole"
+          Effect: "Allow"
+          Action:
+          - "sts:AssumeRole"
+          Principal:
+            Service:
+            - "lambda.amazonaws.com"
+            - "edgelambda.amazonaws.com"
+      Policies:
+      -
+        PolicyName: checkFileExists
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Sid: ReadListings
+            Effect: 'Allow'
+            Action:
+            - 's3:GetObject'
+            Resource: !Sub "arn:aws:s3:::${S3BucketName}/*"
+Outputs:
+  LambdaEdgeFunctionSampleVersion:
+    Description: Lambda@Edge Sample Function ARN with Version
+    Value: !Ref LambdaEdgeFunctionSample.Version
+
+  CFDistribution:
+    Description: Cloudfront Distribution Domain Name
+    Value: !GetAtt CFDistribution.DomainName
