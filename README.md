@@ -35,7 +35,7 @@ This deploys to `Your AWS account` and creates a bucket called `BUCKET_NAME` whe
 
 You will need to create a CNAME entry to validate the *ACM certificate* as it requires DNS validation (check the cloudformation stack update logs in the AWS console for your stack). You will see an entry in your cloudformtation events tab. 
 
-![alt text](https://git.realestate.com.au/sarah-bernard/static-webinator/blob/master/Screen%20Shot%202019-01-23%20at%2010.43.34%20am.png)
+![alt text](https://github.com/Narnie/lambda-edge-static-website-index-doc-support/blob/master/Screen%20Shot%202019-05-12%20at%208.39.41%20pm.png)
 
 You need to add this CNAME entry to your Domain Name System (DNS) web service under the domain name you are using.
 
