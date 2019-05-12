@@ -7,6 +7,14 @@ This repo deploys the infrastructure to create a static website. It will deploy 
 - A Bucket Policy to allow cloudfront to access the S3 bucket
 - An ACM certificate for your custom domain 
 
+## Requirements 
+
+You will need the AWS CLI and AWS SAM installed to run this demo. 
+
+https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html
+
+https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html
+
 ## Deployment 
 
 If you do not have a bucket for your Lambda code you will need to create one. Create the bucket for the lambda code in the same aws account where your static bucket will go, for example:
